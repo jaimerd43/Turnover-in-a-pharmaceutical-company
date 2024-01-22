@@ -1,0 +1,164 @@
+---
+title: "Model Construction and Comparative"
+output: github_document
+---
+
+
+```{r}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(randomForest) 
+library(gbm)
+library(arsenal)
+library(pROC)
+```
+
+
+```{r}
+#omit missing values
+data <- na.omit(data)
+
+set.seed(0000)
+
+#split the data 
+index <- createDataPartition(data$Attrition, p = 0.8, list = FALSE)
+train <- data[index,]
+test <- data[-index, ]
+```
+
+
+## Decision Tree
+
+```{r}
+tree <- rpart(Attrition~., data = train, method = "class")
+tree
+```
+
+Check accuracy with test data
+
+```{r}
+predictions <- predict(tree, test, type = "class")
+postResample(predictions, test$Attrition)
+```
+
+Confusion matrix
+
+```{r}
+cm_tree <- confusionMatrix(data = predictions, test$Attrition, positive = "Yes")
+cm_tree
+```
+
+ROC curve
+
+```{r}
+predictions1 <- predict(tree, test, type = "prob")
+probabilities <- predictions1[, "Yes"]
+roc_curve <- roc(test$Attrition, probabilities)
+area1 <- auc(roc_curve)
+plot(roc_curve, main = "ROC Curve Decision Tree")
+text(x = 0.6, y = 0.2, labels = paste("AUC:", round(area1, 2)))
+```
+
+## Random Forrest
+
+```{r}
+rf <- randomForest(Attrition ~ ., data = train)
+rf
+```
+check accuracy with the test data
+
+```{r}
+pred_rf <- predict(rf,test)
+postResample(pred_rf, test$Attrition)
+```
+
+Confusion matrix
+
+```{r}
+cm_rf <- confusionMatrix(pred_rf,test$Attrition, positive = "Yes")
+cm_rf
+```
+
+ROC Curve
+
+```{r}
+pred_rf_prob <- predict(rf, test, type = "prob")
+probabilities_rf <- pred_rf_prob[, "Yes"]
+roc_curve_rf <- roc(test$Attrition, probabilities_rf)
+auc_rf <- auc(roc_curve_rf)
+plot(roc_curve_rf, main = "ROC Curve Random Forest Model")
+text(x = 0.6, y = 0.2, labels = paste("AUC:", round(auc_rf, 2)))
+```
+
+
+## Gradient Boosting
+
+```{r}
+# Convert "Yes" to 1 and "No" to 0 in the 'Attrition' variable
+train$Attrition <- ifelse(train$Attrition == "Yes", 1, 0)
+```
+
+```{r}
+# Fit the GBM model
+gb <- gbm(Attrition ~ .,
+                 data = train,
+                 distribution = "bernoulli",
+                 n.trees = 500,
+                 shrinkage = 0.01,
+                 interaction.depth = 3,
+                 cv.folds = 10,
+                 n.minobsinnode = 10)
+```
+
+Accuracy with the test data
+```{r}
+pred_gb <- predict(gb, test, n.trees = gb$n.trees, type = "response")
+```
+
+From probabilities to labels 
+
+```{r}
+pred_labels <- ifelse(pred_gb > 0.5, "Yes", "No")
+```
+
+Confusion Matrix
+
+```{r}
+cm_gb <- confusionMatrix(as.factor(pred_labels), test$Attrition, positive = "Yes")
+print(cm_gb)
+```
+
+ROC Curve
+
+```{r}
+roc_curve_gb <- roc(test$Attrition, pred_gb)
+auc_gb <- auc(roc_curve_gb)
+plot(roc_curve_gb, main = "ROC Curve for GBM Model")
+text(x = 0.6, y = 0.2, labels = paste("AUC:", round(auc_gb, 2)))
+```
+
+
+## Comparative of models accuracy
+
+```{r}
+models <- data.frame(Model = c('Random Forest',
+                                      'Decision Tree',
+                                      'Gradient'),
+                            Accuracy = c(cm_rf$overall[1],
+                                         cm_tree$overall[1],
+                                         cm_gb$overall[1]))
+
+#Plot comparing accuracy 
+ggplot(aes(x=Model, y=Accuracy), data=models) +
+  geom_bar(stat='identity', fill = 'blue') +
+  ggtitle('Accuracy of the models') +
+  xlab('Models') +
+  ylab('Accuracy')
+
+```
+
+
+
+
+
