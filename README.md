@@ -6,4 +6,4 @@
 * Optimized Decision Tree, Gradient Boots and Randon Forest Classificators using CV to reach the best model.
 * Tableau and R.2
 * The final Tableau Dashboard can be found under the name "TableauDashboard.png".
-* The full R code: "R-Code.md".
+* The full R code: "Models".
